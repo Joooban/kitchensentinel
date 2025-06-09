@@ -1,15 +1,17 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { onValue, ref } from 'firebase/database';
+import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  FlatList,
+  Image,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { database } from '../config/firebase';
 
 // Type definitions
 interface AlertItem {
@@ -71,26 +73,22 @@ export default function ActivityLog() {
     }
   ]);
 
-  // TODO: Replace with Firebase real-time listener
-  /*
-  useEffect(() => {
-    const database = getDatabase();
+    useEffect(() => {
     const alertsRef = ref(database, 'alerts');
-    
+
     const unsubscribe = onValue(alertsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const alertsArray = Object.keys(data).map(key => ({
           id: key,
           ...data[key]
-        })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         setAlertHistory(alertsArray);
       }
     });
 
     return () => unsubscribe();
   }, []);
-  */
 
   const formatTimestamp = (timestamp: string): string => {
     const date = new Date(timestamp);
@@ -248,6 +246,7 @@ export default function ActivityLog() {
   );
 }
 
+// CSS
 const styles = StyleSheet.create({
   container: {
     flex: 1,

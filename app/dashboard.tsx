@@ -1,6 +1,9 @@
 import { useRouter } from 'expo-router';
+import { onValue, ref } from 'firebase/database';
 import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { database } from '../config/firebase'; // Adjust the import path as needed
+
 
 export default function Dashboard() {
   const router = useRouter();
@@ -13,16 +16,22 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setSensorData(prev => ({
-        ...prev,
-        lastUpdated: new Date().toLocaleTimeString(),
-        motionDetected: Math.random() > 0.8,
-      }));
-    }, 5000);
+  const sensorRef = ref(database, 'sensors/latest'); // Match ESP32 path 
 
-    return () => clearInterval(interval);
-  }, []);
+  const unsubscribe = onValue(sensorRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      setSensorData({
+      gasLeak: data.gasLeak,
+      flamePresence: data.flameDetected, // Use flameDetected instead
+      motionDetected: data.motionDetected,
+      lastUpdated: new Date().toLocaleTimeString(),
+    });
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
 
   const hasAlert = sensorData.flamePresence && !sensorData.motionDetected;
 
@@ -97,6 +106,7 @@ export default function Dashboard() {
   );
 }
 
+// CSS
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,

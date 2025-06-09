@@ -1,18 +1,27 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Image,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 // Type definitions
+interface EmergencyContact {
+  id: string;
+  name: string;
+  phone: string;
+  relationship: string;
+}
+
 interface SettingsState {
   notifications: boolean;
   caregiverNotifications: boolean;
@@ -20,6 +29,7 @@ interface SettingsState {
   caregiverPhone: string;
   darkMode: boolean;
   fontSize: 'SMALL' | 'MEDIUM' | 'LARGE';
+  emergencyContacts: EmergencyContact[];
 }
 
 export default function Settings() {
@@ -32,6 +42,39 @@ export default function Settings() {
     caregiverPhone: '+1234567890',
     darkMode: false,
     fontSize: 'MEDIUM',
+    emergencyContacts: [
+      {
+        id: '1',
+        name: 'John Doe',
+        phone: '+1234567890',
+        relationship: 'Son'
+      },
+      {
+        id: '2',
+        name: 'Jane Smith',
+        phone: '+0987654321',
+        relationship: 'Daughter'
+      }
+    ],
+  });
+
+  const [showCaregiverModal, setShowCaregiverModal] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<EmergencyContact | null>(null);
+
+  // Form states for caregiver
+  const [caregiverForm, setCaregiverForm] = useState({
+    name: '',
+    phone: settings.caregiverPhone,
+    email: settings.caregiverEmail,
+  });
+
+  // Form states for emergency contact
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    phone: '',
+    relationship: '',
   });
 
   const updateSetting = (key: keyof SettingsState, value: any) => {
@@ -56,6 +99,107 @@ export default function Settings() {
         },
       },
     ]);
+  };
+
+  // Caregiver functions
+  const handleCaregiverSave = () => {
+    if (!caregiverForm.phone.trim()) {
+      Alert.alert('Error', 'Phone number is required');
+      return;
+    }
+
+    updateSetting('caregiverPhone', caregiverForm.phone);
+    updateSetting('caregiverEmail', caregiverForm.email);
+    setShowCaregiverModal(false);
+    Alert.alert('Success', 'Caregiver information updated successfully!');
+  };
+
+  const openCaregiverModal = () => {
+    setCaregiverForm({
+      name: '',
+      phone: settings.caregiverPhone,
+      email: settings.caregiverEmail,
+    });
+    setShowCaregiverModal(true);
+  };
+
+  // Emergency contact functions
+  const handleAddContact = () => {
+    if (!contactForm.name.trim() || !contactForm.phone.trim()) {
+      Alert.alert('Error', 'Name and phone number are required');
+      return;
+    }
+
+    const newContact: EmergencyContact = {
+      id: Date.now().toString(),
+      name: contactForm.name,
+      phone: contactForm.phone,
+      relationship: contactForm.relationship || 'Other',
+    };
+
+    const updatedContacts = [...settings.emergencyContacts, newContact];
+    updateSetting('emergencyContacts', updatedContacts);
+    
+    setContactForm({ name: '', phone: '', relationship: '' });
+    setShowAddContactModal(false);
+    Alert.alert('Success', 'Emergency contact added successfully!');
+  };
+
+  const handleEditContact = (contact: EmergencyContact) => {
+    setEditingContact(contact);
+    setContactForm({
+      name: contact.name,
+      phone: contact.phone,
+      relationship: contact.relationship,
+    });
+    setShowAddContactModal(true);
+  };
+
+  const handleUpdateContact = () => {
+    if (!contactForm.name.trim() || !contactForm.phone.trim()) {
+      Alert.alert('Error', 'Name and phone number are required');
+      return;
+    }
+
+    if (!editingContact) return;
+
+    const updatedContacts = settings.emergencyContacts.map(contact =>
+      contact.id === editingContact.id
+        ? {
+            ...contact,
+            name: contactForm.name,
+            phone: contactForm.phone,
+            relationship: contactForm.relationship || 'Other',
+          }
+        : contact
+    );
+
+    updateSetting('emergencyContacts', updatedContacts);
+    setContactForm({ name: '', phone: '', relationship: '' });
+    setEditingContact(null);
+    setShowAddContactModal(false);
+    Alert.alert('Success', 'Emergency contact updated successfully!');
+  };
+
+  const handleDeleteContact = (contactId: string) => {
+    Alert.alert(
+      'Delete Contact',
+      'Are you sure you want to delete this emergency contact?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updatedContacts = settings.emergencyContacts.filter(
+              contact => contact.id !== contactId
+            );
+            updateSetting('emergencyContacts', updatedContacts);
+            Alert.alert('Success', 'Emergency contact deleted successfully!');
+          },
+        },
+      ]
+    );
   };
 
   const handleHelpCenter = () => {
@@ -107,6 +251,15 @@ Phone: 1-800-KITCHEN`;
           : settings.fontSize === 'LARGE'
           ? 16
           : 14,
+    },
+    modalBackground: {
+      backgroundColor: settings.darkMode ? '#1E1E1E' : '#FFFFFF',
+    },
+    inputBackground: {
+      backgroundColor: settings.darkMode ? '#333333' : '#F5F5F5',
+    },
+    inputText: {
+      color: settings.darkMode ? '#FFFFFF' : '#333333',
     },
   };
 
@@ -165,6 +318,32 @@ Phone: 1-800-KITCHEN`;
     </View>
   );
 
+  const renderEmergencyContact = (contact: EmergencyContact) => (
+    <View key={contact.id} style={[styles.contactCard, dynamicStyles.cardBackground]}>
+      <View style={styles.contactInfo}>
+        <Text style={[styles.contactName, dynamicStyles.text]}>{contact.name}</Text>
+        <Text style={[styles.contactPhone, dynamicStyles.subtitleText]}>{contact.phone}</Text>
+        <Text style={[styles.contactRelation, dynamicStyles.subtitleText]}>
+          {contact.relationship}
+        </Text>
+      </View>
+      <View style={styles.contactActions}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => handleEditContact(contact)}
+        >
+          <Text style={styles.editButtonText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteContact(contact.id)}
+        >
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <>
       <StatusBar
@@ -203,23 +382,18 @@ Phone: 1-800-KITCHEN`;
           {renderSettingCard(
             '📞',
             'ADD CAREGIVER NUMBER',
-            'Set up emergency contact',
-            () => {
-              Alert.prompt(
-                'Caregiver Phone',
-                'Enter caregiver phone number:',
-                (text) => updateSetting('caregiverPhone', text),
-                'plain-text',
-                settings.caregiverPhone
-              );
-            },
+            'Set up primary caregiver contact',
+            openCaregiverModal,
             <Text style={[styles.phoneNumber, dynamicStyles.subtitleText]}>
               {settings.caregiverPhone || 'Not set'}
             </Text>
           )}
 
-          {renderSettingCard('📋', 'EMERGENCY CONTACT LIST', 'Manage emergency contacts', () =>
-            Alert.alert('Emergency Contacts', 'Feature coming soon!')
+          {renderSettingCard(
+            '📋',
+            'EMERGENCY CONTACT LIST',
+            `Manage emergency contacts (${settings.emergencyContacts.length} contacts)`,
+            () => setShowEmergencyModal(true)
           )}
 
           {renderSettingCard(
@@ -242,6 +416,194 @@ Phone: 1-800-KITCHEN`;
 
           {renderSettingCard('❓', 'HELP CENTER', 'Get support and view user manual', handleHelpCenter)}
         </ScrollView>
+
+        {/* Caregiver Modal */}
+        <Modal
+          visible={showCaregiverModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowCaregiverModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, dynamicStyles.modalBackground]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, dynamicStyles.text]}>
+                  Caregiver Information
+                </Text>
+                <TouchableOpacity onPress={() => setShowCaregiverModal(false)}>
+                  <Text style={styles.closeButton}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.inputLabel, dynamicStyles.text]}>Name (Optional)</Text>
+                <TextInput
+                  style={[styles.input, dynamicStyles.inputBackground, dynamicStyles.inputText]}
+                  value={caregiverForm.name}
+                  onChangeText={(text) => setCaregiverForm({...caregiverForm, name: text})}
+                  placeholder="Enter caregiver name"
+                  placeholderTextColor={settings.darkMode ? '#888' : '#999'}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.inputLabel, dynamicStyles.text]}>Phone Number *</Text>
+                <TextInput
+                  style={[styles.input, dynamicStyles.inputBackground, dynamicStyles.inputText]}
+                  value={caregiverForm.phone}
+                  onChangeText={(text) => setCaregiverForm({...caregiverForm, phone: text})}
+                  placeholder="Enter phone number"
+                  placeholderTextColor={settings.darkMode ? '#888' : '#999'}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.inputLabel, dynamicStyles.text]}>Email (Optional)</Text>
+                <TextInput
+                  style={[styles.input, dynamicStyles.inputBackground, dynamicStyles.inputText]}
+                  value={caregiverForm.email}
+                  onChangeText={(text) => setCaregiverForm({...caregiverForm, email: text})}
+                  placeholder="Enter email address"
+                  placeholderTextColor={settings.darkMode ? '#888' : '#999'}
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setShowCaregiverModal(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={handleCaregiverSave}
+                >
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Emergency Contacts Modal */}
+        <Modal
+          visible={showEmergencyModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowEmergencyModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, styles.emergencyModalContent, dynamicStyles.modalBackground]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, dynamicStyles.text]}>
+                  Emergency Contacts
+                </Text>
+                <TouchableOpacity onPress={() => setShowEmergencyModal(false)}>
+                  <Text style={styles.closeButton}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.contactsList}>
+                {settings.emergencyContacts.map(renderEmergencyContact)}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={styles.addContactButton}
+                onPress={() => {
+                  setEditingContact(null);
+                  setContactForm({ name: '', phone: '', relationship: '' });
+                  setShowAddContactModal(true);
+                }}
+              >
+                <Text style={styles.addContactButtonText}>+ Add New Contact</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Add/Edit Contact Modal */}
+        <Modal
+          visible={showAddContactModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => {
+            setShowAddContactModal(false);
+            setEditingContact(null);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, dynamicStyles.modalBackground]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, dynamicStyles.text]}>
+                  {editingContact ? 'Edit Contact' : 'Add New Contact'}
+                </Text>
+                <TouchableOpacity onPress={() => {
+                  setShowAddContactModal(false);
+                  setEditingContact(null);
+                }}>
+                  <Text style={styles.closeButton}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.inputLabel, dynamicStyles.text]}>Name *</Text>
+                <TextInput
+                  style={[styles.input, dynamicStyles.inputBackground, dynamicStyles.inputText]}
+                  value={contactForm.name}
+                  onChangeText={(text) => setContactForm({...contactForm, name: text})}
+                  placeholder="Enter contact name"
+                  placeholderTextColor={settings.darkMode ? '#888' : '#999'}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.inputLabel, dynamicStyles.text]}>Phone Number *</Text>
+                <TextInput
+                  style={[styles.input, dynamicStyles.inputBackground, dynamicStyles.inputText]}
+                  value={contactForm.phone}
+                  onChangeText={(text) => setContactForm({...contactForm, phone: text})}
+                  placeholder="Enter phone number"
+                  placeholderTextColor={settings.darkMode ? '#888' : '#999'}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={[styles.inputLabel, dynamicStyles.text]}>Relationship</Text>
+                <TextInput
+                  style={[styles.input, dynamicStyles.inputBackground, dynamicStyles.inputText]}
+                  value={contactForm.relationship}
+                  onChangeText={(text) => setContactForm({...contactForm, relationship: text})}
+                  placeholder="e.g., Son, Daughter, Friend"
+                  placeholderTextColor={settings.darkMode ? '#888' : '#999'}
+                />
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowAddContactModal(false);
+                    setEditingContact(null);
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={editingContact ? handleUpdateContact : handleAddContact}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {editingContact ? 'Update' : 'Add'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </>
   );
@@ -308,49 +670,156 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  sensitivityBadge: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
   badgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-  sectionSpacer: { marginTop: 24, marginBottom: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, paddingHorizontal: 4 },
-  testButton: {
-    backgroundColor: '#4CAF50',
-    padding: 18,
-    borderRadius: 16,
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
   },
-  testButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  resetButton: {
-    backgroundColor: '#FF9800',
-    padding: 18,
-    borderRadius: 16,
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  emergencyModalContent: {
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    elevation: 2,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    fontSize: 24,
+    color: '#666',
+    padding: 5,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#F5F5F5',
+  },
+  saveButton: {
+    backgroundColor: '#2196F3',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Emergency contacts styles
+  contactsList: {
+    maxHeight: 300,
+  },
+  contactCard: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
   },
-  resetButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  infoBox: {
-    padding: 20,
-    borderRadius: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
-    marginBottom: 30,
+  contactInfo: {
+    flex: 1,
   },
-  infoTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
-  infoText: { fontSize: 14, marginBottom: 6, lineHeight: 20 },
+  contactName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  contactPhone: {
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  contactRelation: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  contactActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  deleteButton: {
+    backgroundColor: '#F44336',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  editButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  addContactButton: {
+    backgroundColor: '#2196F3',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  addContactButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
