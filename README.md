@@ -1,2 +1,1 @@
-**Kitchen Sentinel
-**
+**Kitche Sentinel**
