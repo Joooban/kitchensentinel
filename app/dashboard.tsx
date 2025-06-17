@@ -20,10 +20,11 @@ export default function Dashboard() {
 
   const unsubscribe = onValue(sensorRef, (snapshot) => {
     const data = snapshot.val();
+    console.log("Sensor data from Firebase:", data); // Add this line
     if (data) {
       setSensorData({
       gasLeak: data.gasLeak,
-      flamePresence: data.flameDetected, // Use flameDetected instead
+      flamePresence: data.flamePresence === true || data.flamePresence === "true",
       motionDetected: data.motionDetected,
       lastUpdated: new Date().toLocaleTimeString(),
     });
@@ -71,7 +72,7 @@ export default function Dashboard() {
           {/* Status Cards */}
           <View style={styles.statusContainer}>
             {renderStatusItem("💨", "GAS LEAK", sensorData.gasLeak ? "LEAK DETECTED!" : "NO LEAKS DETECTED!", !sensorData.gasLeak)}
-            {renderStatusItem("🔥", "FLAME PRESENCE", sensorData.flamePresence ? "FLAME DETECTED!" : "NO FLAME DETECTED!", sensorData.flamePresence)}
+            {renderStatusItem("🔥", "FLAME PRESENCE", sensorData.flamePresence ? "FLAME DETECTED!" : "NO FLAME DETECTED!", !sensorData.flamePresence)}
             {renderStatusItem("👤", "MOTION DETECTOR", sensorData.motionDetected ? "MOTION DETECTED!" : "NO MOTION DETECTED!", sensorData.motionDetected || !sensorData.flamePresence)}
           </View>
 
