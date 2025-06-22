@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { onValue, ref } from 'firebase/database';
+import { onValue, ref, remove } from 'firebase/database';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -16,98 +16,76 @@ import { database } from '../config/firebase';
 // Type definitions
 interface AlertItem {
   id: string;
-  type: 'FLAME_NO_MOTION' | 'GAS_LEAK' | 'MOTION_DETECTED' | 'SYSTEM_STARTUP';
+  type: string;
   message: string;
   timestamp: string;
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+  severity: string;
   resolved: boolean;
 }
 
-type AlertType = 'FLAME_NO_MOTION' | 'GAS_LEAK' | 'MOTION_DETECTED' | 'SYSTEM_STARTUP';
-type SeverityLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
-
 export default function ActivityLog() {
   const router = useRouter();
-  
-  // Placeholder alert history - will be replaced with Firebase data
-  const [alertHistory, setAlertHistory] = useState<AlertItem[]>([
-    {
-      id: '1',
-      type: 'FLAME_NO_MOTION',
-      message: 'Flame detected with no motion in kitchen',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
-      severity: 'HIGH',
-      resolved: false
-    },
-    {
-      id: '2',
-      type: 'GAS_LEAK',
-      message: 'Gas leak detected in kitchen area',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-      severity: 'CRITICAL',
-      resolved: true
-    },
-    {
-      id: '3',
-      type: 'FLAME_NO_MOTION',
-      message: 'Flame detected with no motion in kitchen',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
-      severity: 'HIGH',
-      resolved: true
-    },
-    {
-      id: '4',
-      type: 'MOTION_DETECTED',
-      message: 'Motion detected - Normal activity',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(), // 8 hours ago
-      severity: 'LOW',
-      resolved: true
-    },
-    {
-      id: '5',
-      type: 'SYSTEM_STARTUP',
-      message: 'Kitchen Sentinel system initialized',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-      severity: 'INFO',
-      resolved: true
-    }
-  ]);
+  const [alertHistory, setAlertHistory] = useState<AlertItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+  useEffect(() => {
     const alertsRef = ref(database, 'alerts');
 
     const unsubscribe = onValue(alertsRef, (snapshot) => {
       const data = snapshot.val();
+      console.log('Raw Firebase alerts data:', data);
+      
       if (data) {
         const alertsArray = Object.keys(data).map(key => ({
           id: key,
-          ...data[key]
+          type: data[key].type || 'UNKNOWN',
+          message: data[key].message || 'No message',
+          timestamp: data[key].timestamp || new Date().toISOString(),
+          severity: data[key].severity || 'MEDIUM',
+          resolved: data[key].resolved || false
         })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        
+        console.log('Processed alerts array:', alertsArray);
         setAlertHistory(alertsArray);
+      } else {
+        console.log('No alerts data found');
+        setAlertHistory([]);
       }
+      setLoading(false);
+    }, (error) => {
+      console.error('Firebase error:', error);
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
   const formatTimestamp = (timestamp: string): string => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) {
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-      return `${diffInMinutes} minutes ago`;
-    } else if (diffInHours < 24) {
-      return `${diffInHours} hours ago`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays} days ago`;
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffInMs = now.getTime() - date.getTime();
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+      const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+      
+      if (diffInMinutes < 1) {
+        return 'Just now';
+      } else if (diffInMinutes < 60) {
+        return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+      } else if (diffInHours < 24) {
+        return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+      } else {
+        return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+      }
+    } catch (error) {
+      console.error('Error formatting timestamp:', error);
+      return 'Unknown time';
     }
   };
 
-  const getSeverityColor = (severity: SeverityLevel): string => {
-    switch (severity) {
+  const getSeverityColor = (severity: string): string => {
+    switch (severity.toUpperCase()) {
       case 'CRITICAL': return '#D32F2F';
       case 'HIGH': return '#FF5722';
       case 'MEDIUM': return '#FF9800';
@@ -117,14 +95,13 @@ export default function ActivityLog() {
     }
   };
 
-  const getSeverityIcon = (type: AlertType): string => {
-    switch (type) {
-      case 'FLAME_NO_MOTION': return '🔥';
-      case 'GAS_LEAK': return '💨';
-      case 'MOTION_DETECTED': return '👤';
-      case 'SYSTEM_STARTUP': return '⚡';
-      default: return '⚠️';
-    }
+  const getSeverityIcon = (type: string): string => {
+    const alertType = type.toUpperCase();
+    if (alertType.includes('FLAME')) return '🔥';
+    if (alertType.includes('GAS')) return '💨';
+    if (alertType.includes('MOTION')) return '👤';
+    if (alertType.includes('SYSTEM') || alertType.includes('STARTUP')) return '⚡';
+    return '⚠️';
   };
 
   const handleClearHistory = () => {
@@ -139,18 +116,16 @@ export default function ActivityLog() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setAlertHistory([]);
-            // TODO: Clear Firebase history
-            /*
-            const database = getDatabase();
-            const alertsRef = ref(database, 'alerts');
-            remove(alertsRef).then(() => {
+          onPress: async () => {
+            try {
+              const alertsRef = ref(database, 'alerts');
+              await remove(alertsRef);
               console.log('Alert history cleared from Firebase');
-            }).catch((error) => {
+              setAlertHistory([]);
+            } catch (error) {
               console.error('Error clearing history:', error);
-            });
-            */
+              Alert.alert('Error', 'Failed to clear history. Please try again.');
+            }
           },
         },
       ],
@@ -162,8 +137,7 @@ export default function ActivityLog() {
       router.back();
     } catch (error) {
       console.log('Error navigating back:', error);
-      // Fallback navigation - you can customize this based on your app structure
-      router.push('/'); // or router.replace('/dashboard') or whatever your main screen is
+      router.push('/');
     }
   };
 
@@ -188,6 +162,39 @@ export default function ActivityLog() {
       </View>
     </View>
   );
+
+  if (loading) {
+    return (
+      <>
+        <StatusBar backgroundColor="#2196F3" barStyle="light-content" />
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={handleBackPress}
+              activeOpacity={0.7}
+            >
+              <View style={styles.backButtonContent}>
+                <Text style={styles.backArrow}>‹</Text>
+                <Text style={styles.backButtonText}>Back</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={styles.logoContainer}>
+              <Image 
+                source={require('../assets/images/kitchen-logo.jpg')} 
+                style={styles.logoImage} 
+              />
+              <Text style={styles.headerTitle}>Activity Log</Text>
+            </View>
+            <View style={styles.clearButton} />
+          </View>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading alerts...</Text>
+          </View>
+        </View>
+      </>
+    );
+  }
 
   return (
     <>
@@ -246,7 +253,7 @@ export default function ActivityLog() {
   );
 }
 
-// CSS
+// CSS remains the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -404,41 +411,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
 });
-
-// TODO: Firebase Integration Notes
-/*
-1. Alert Storage Structure:
-{
-  "alerts": {
-    "alert_id_1": {
-      "type": "FLAME_NO_MOTION",
-      "message": "Flame detected with no motion in kitchen",
-      "timestamp": "2024-01-15T10:30:00.000Z",
-      "severity": "HIGH",
-      "resolved": false,
-      "sensorData": {
-        "gasLeak": false,
-        "flamePresence": true,
-        "motionDetected": false
-      }
-    }
-  }
-}
-
-2. ESP32 Integration:
-- When ESP32 detects an alert condition, it should push to Firebase alerts collection
-- Include timestamp, sensor readings, and alert type
-- Dashboard can mark alerts as resolved when conditions return to normal
-
-3. Firebase Functions to Implement:
-- fetchAlerts(): Get all alerts ordered by timestamp
-- clearAllAlerts(): Remove all alert history
-- markAlertResolved(alertId): Update alert status
-- addAlert(alertData): Add new alert from ESP32
-
-4. Real-time Updates:
-- Use onValue() listener to get real-time updates
-- Sort alerts by timestamp (newest first)
-- Handle connection states and offline scenarios
-*/

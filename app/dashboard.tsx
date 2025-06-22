@@ -1,8 +1,10 @@
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { onValue, ref } from 'firebase/database';
 import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { database } from '../config/firebase'; // Adjust the import path as needed
+import { database } from '../config/firebase';
+import { registerForPushNotificationsAsync } from '../services/notificationService';
 
 
 export default function Dashboard() {
@@ -15,19 +17,34 @@ export default function Dashboard() {
     lastUpdated: new Date().toLocaleTimeString(),
   });
 
-  useEffect(() => {
-  const sensorRef = ref(database, 'sensors/latest'); // Match ESP32 path 
+useEffect(() => {
+  registerForPushNotificationsAsync();
+
+  const sensorRef = ref(database, 'sensors/latest');
 
   const unsubscribe = onValue(sensorRef, (snapshot) => {
     const data = snapshot.val();
-    console.log("Sensor data from Firebase:", data); // Add this line
     if (data) {
-      setSensorData({
-      gasLeak: data.gasLeak,
-      flamePresence: data.flamePresence === true || data.flamePresence === "true",
-      motionDetected: data.motionDetected,
-      lastUpdated: new Date().toLocaleTimeString(),
-    });
+      const updated = {
+        gasLeak: data.gasLeak,
+        flamePresence: data.flamePresence === true || data.flamePresence === "true",
+        motionDetected: data.motionDetected,
+        lastUpdated: new Date().toLocaleTimeString(),
+      };
+
+      setSensorData(updated);
+
+      // 🔔 Send local notification
+      if (updated.flamePresence && !updated.motionDetected) {
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: "🔥 Flame Detected",
+            body: "No motion detected. Please check your kitchen!",
+            sound: true,
+          },
+          trigger: null,
+        });
+      }
     }
   });
 
