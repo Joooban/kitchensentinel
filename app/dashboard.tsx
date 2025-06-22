@@ -1,57 +1,92 @@
-import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { onValue, ref } from 'firebase/database';
 import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { database } from '../config/firebase';
-import { registerForPushNotificationsAsync } from '../services/notificationService';
-
+import { NotificationService } from '../services/notificationService';
 
 export default function Dashboard() {
   const router = useRouter();
 
   const [sensorData, setSensorData] = useState({
     gasLeak: false,
-    flamePresence: true,
+    flamePresence: false,
     motionDetected: false,
     lastUpdated: new Date().toLocaleTimeString(),
   });
 
-useEffect(() => {
-  registerForPushNotificationsAsync();
+  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const [notificationDismissed, setNotificationDismissed] = useState(false);
 
-  const sensorRef = ref(database, 'sensors/latest');
+  useEffect(() => {
+    const sensorRef = ref(database, 'sensors/latest');
 
-  const unsubscribe = onValue(sensorRef, (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-      const updated = {
-        gasLeak: data.gasLeak,
-        flamePresence: data.flamePresence === true || data.flamePresence === "true",
-        motionDetected: data.motionDetected,
-        lastUpdated: new Date().toLocaleTimeString(),
-      };
-
-      setSensorData(updated);
-
-      // 🔔 Send local notification
-      if (updated.flamePresence && !updated.motionDetected) {
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: "🔥 Flame Detected",
-            body: "No motion detected. Please check your kitchen!",
-            sound: true,
-          },
-          trigger: null,
-        });
+    const unsubscribe = onValue(sensorRef, (snapshot) => {
+      const data = snapshot.val();
+      console.log("Sensor data from Firebase:", data);
+      
+      if (data) {
+        const newSensorData = {
+          gasLeak: data.gasLeak === true || data.gasLeak === "true",
+          flamePresence: data.flamePresence === true || data.flamePresence === "true", 
+          motionDetected: data.motionDetected === true || data.motionDetected === "true",
+          lastUpdated: new Date().toLocaleTimeString(),
+        };
+        
+        setSensorData(newSensorData);
+        setConnectionStatus('Connected');
+        
+        // Check if system was reset - if so, clear any dismissed notifications
+        if (data.systemReset === true) {
+          setNotificationDismissed(false);
+          console.log("System was reset - clearing notification dismissal");
+        }
+        
+        // Reset notification dismissed state when new alert occurs
+        const hasNewAlert = (newSensorData.flamePresence && !newSensorData.motionDetected) || 
+                          newSensorData.gasLeak;
+        if (hasNewAlert) {
+          setNotificationDismissed(false);
+        }
+      } else {
+        setConnectionStatus('No data');
       }
-    }
-  });
+    }, (error) => {
+      console.error("Firebase error:", error);
+      setConnectionStatus('Connection error');
+    });
 
-  return () => unsubscribe();
-}, []);
+    return () => unsubscribe();
+  }, []);
 
+  // Determine alert status
   const hasAlert = sensorData.flamePresence && !sensorData.motionDetected;
+  const hasGasAlert = sensorData.gasLeak;
+  const hasCriticalAlert = hasGasAlert && sensorData.flamePresence;
+
+  const getAlertLevel = () => {
+    if (hasCriticalAlert) return 'CRITICAL';
+    if (hasGasAlert) return 'HIGH';
+    if (hasAlert) return 'HIGH';
+    return 'NORMAL';
+  };
+
+  const getAlertMessage = () => {
+    if (hasCriticalAlert) {
+      return 'CRITICAL: GAS LEAK AND FLAME DETECTED!';
+    }
+    if (hasGasAlert) {
+      return 'WARNING: GAS LEAK DETECTED!';
+    }
+    if (hasAlert) {
+      return 'ALERT: FLAME DETECTED WITH NO MOTION!';
+    }
+    return null;
+  };
+
+  const handleDismissNotification = () => {
+    setNotificationDismissed(true);
+  };
 
   const renderStatusItem = (icon: string, label: string, status: string, isGood: boolean) => (
     <View style={styles.statusItem}>
@@ -67,9 +102,14 @@ useEffect(() => {
     </View>
   );
 
+  const alertLevel = getAlertLevel();
+  const alertMessage = getAlertMessage();
+  const showAlert = alertMessage && !notificationDismissed;
+
   return (
     <>
       <StatusBar backgroundColor="#2196F3" barStyle="light-content" />
+      <NotificationService />
       <View style={styles.wrapper}>
         <ScrollView contentContainerStyle={styles.container}>
           {/* Header */}
@@ -84,38 +124,100 @@ useEffect(() => {
                 <Text style={styles.sentinelText}>SENTINEL</Text>
               </Text>
             </View>
+            <View style={styles.connectionStatus}>
+              <View style={[styles.statusDot, { 
+                backgroundColor: connectionStatus === 'Connected' ? '#4CAF50' : 
+                                connectionStatus === 'Connecting...' ? '#FF9800' : '#F44336' 
+              }]} />
+              <Text style={styles.connectionText}>{connectionStatus}</Text>
+            </View>
           </View>
+
+          {/* Critical Alert Banner */}
+          {alertLevel === 'CRITICAL' && !notificationDismissed && (
+            <View style={styles.criticalAlertBanner}>
+              <Text style={styles.criticalAlertText}>🚨 EMERGENCY 🚨</Text>
+              <Text style={styles.criticalAlertSubtext}>EVACUATE IMMEDIATELY</Text>
+            </View>
+          )}
 
           {/* Status Cards */}
           <View style={styles.statusContainer}>
-            {renderStatusItem("💨", "GAS LEAK", sensorData.gasLeak ? "LEAK DETECTED!" : "NO LEAKS DETECTED!", !sensorData.gasLeak)}
-            {renderStatusItem("🔥", "FLAME PRESENCE", sensorData.flamePresence ? "FLAME DETECTED!" : "NO FLAME DETECTED!", !sensorData.flamePresence)}
-            {renderStatusItem("👤", "MOTION DETECTOR", sensorData.motionDetected ? "MOTION DETECTED!" : "NO MOTION DETECTED!", sensorData.motionDetected || !sensorData.flamePresence)}
+            {renderStatusItem(
+              "💨", 
+              "GAS LEAK", 
+              sensorData.gasLeak ? "LEAK DETECTED!" : "NO LEAKS DETECTED!", 
+              !sensorData.gasLeak
+            )}
+            {renderStatusItem(
+              "🔥", 
+              "FLAME PRESENCE", 
+              sensorData.flamePresence ? "FLAME DETECTED!" : "NO FLAME DETECTED!", 
+              !sensorData.flamePresence
+            )}
+            {renderStatusItem(
+              "👤", 
+              "MOTION DETECTOR", 
+              sensorData.motionDetected ? "MOTION DETECTED!" : "NO MOTION DETECTED!", 
+              sensorData.motionDetected || !sensorData.flamePresence
+            )}
           </View>
 
           {/* Alert Box */}
-          {hasAlert && (
+          {showAlert && (
             <View style={styles.alertContainer}>
-              <View style={styles.alertBox}>
-                <Text style={styles.alertLabel}>ALERT:</Text>
-                <Text style={styles.alertText}>FLAME DETECTED WITH NO MOTION! PLEASE CHECK YOUR KITCHEN.</Text>
+              <View style={[styles.alertBox, {
+                backgroundColor: alertLevel === 'CRITICAL' ? '#B71C1C' : '#F44336'
+              }]}>
+                <View style={styles.alertHeader}>
+                  <Text style={styles.alertLabel}>
+                    {alertLevel === 'CRITICAL' ? 'EMERGENCY:' : 'ALERT:'}
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.dismissButton}
+                    onPress={handleDismissNotification}
+                  >
+                    <Text style={styles.dismissButtonText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.alertText}>{alertMessage}</Text>
+                {alertLevel === 'CRITICAL' && (
+                  <Text style={styles.emergencyText}>⚠️ CALL EMERGENCY SERVICES ⚠️</Text>
+                )}
               </View>
               <View style={styles.caregiverAlert}>
-                <Text style={styles.caregiverText}>CAREGIVER ALERT: NOTIFICATIONS SENT TO CAREGIVER</Text>
+                <Text style={styles.caregiverText}>
+                  📱 CAREGIVER ALERT: NOTIFICATIONS SENT
+                </Text>
               </View>
             </View>
           )}
 
-          {/* Last Updated */}
-          <Text style={styles.lastUpdated}>Last updated: {sensorData.lastUpdated}</Text>
+          {/* System Status */}
+          <View style={styles.systemStatus}>
+            <Text style={styles.systemStatusTitle}>System Status</Text>
+            <Text style={styles.systemStatusText}>
+              Alert Level: <Text style={[styles.alertLevelText, {
+                color: alertLevel === 'CRITICAL' ? '#B71C1C' : 
+                       alertLevel === 'HIGH' ? '#F44336' : '#4CAF50'
+              }]}>{alertLevel}</Text>
+            </Text>
+            <Text style={styles.lastUpdated}>Last updated: {sensorData.lastUpdated}</Text>
+          </View>
         </ScrollView>
 
         {/* Fixed Action Buttons */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={() => router.push('./activitylog')}>
+          <TouchableOpacity 
+            style={[styles.button, styles.primaryButton]} 
+            onPress={() => router.push('./activitylog')}
+          >
             <Text style={styles.buttonText}>📋 ACTIVITY LOG</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={() => router.push('/settings')}>
+          <TouchableOpacity 
+            style={[styles.button, styles.secondaryButton]} 
+            onPress={() => router.push('/settings')}
+          >
             <Text style={styles.buttonText}>⚙️ SETTINGS</Text>
           </TouchableOpacity>
         </View>
@@ -124,7 +226,6 @@ useEffect(() => {
   );
 }
 
-// CSS
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
@@ -137,12 +238,13 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
     paddingTop: 20,
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 10,
   },
   logoImage: {
     width: 45,
@@ -159,6 +261,41 @@ const styles = StyleSheet.create({
   },
   sentinelText: {
     color: '#2196F3',
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  connectionText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  criticalAlertBanner: {
+    backgroundColor: '#B71C1C',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#FFEB3B',
+  },
+  criticalAlertText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  criticalAlertSubtext: {
+    color: '#FFEB3B',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   statusContainer: {
     marginBottom: 20,
@@ -201,20 +338,44 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   alertBox: {
-    backgroundColor: '#F44336',
     padding: 16,
     borderRadius: 10,
     marginBottom: 10,
+  },
+  alertHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
   },
   alertLabel: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 18,
-    marginBottom: 5,
+  },
+  dismissButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dismissButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   alertText: {
     color: '#fff',
     fontSize: 16,
+    marginBottom: 10,
+  },
+  emergencyText: {
+    color: '#FFEB3B',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   caregiverAlert: {
     backgroundColor: '#2196F3',
@@ -224,13 +385,31 @@ const styles = StyleSheet.create({
   },
   caregiverText: {
     color: '#fff',
+    fontSize: 14,
+  },
+  systemStatus: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  systemStatusTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  systemStatusText: {
     fontSize: 16,
+    marginBottom: 5,
+    color: '#666',
+  },
+  alertLevelText: {
+    fontWeight: 'bold',
   },
   lastUpdated: {
-    textAlign: 'center',
-    color: '#555',
-    marginTop: 10,
-    marginBottom: 20,
+    fontSize: 14,
+    color: '#999',
   },
   buttonContainer: {
     flexDirection: 'row',
