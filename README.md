@@ -1,10 +1,12 @@
 # 👋 Welcome to Kitchen Sentinel
 
-![Kitchen Sentinel Logo](![Kitchen Sentinel](https://github.com/user-attachments/assets/46070eb3-0179-4b69-a4ac-6a2be73557aa)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/46070eb3-0179-4b69-a4ac-6a2be73557aa" alt="Kitchen Sentinel Logo" width="200"/>
+</p>
 
 **Kitchen Sentinel** is our smart IoT-based kitchen safety system designed to assist elderly users and caregivers by detecting gas leaks, flames, and motion inactivity.
 
-This repository contains everything you need to explore our project—from the mobile app and embedded system code to documentation and evaluations.
+This repository contains everything you need to explore our project — from the mobile app and embedded system code to documentation and evaluations.
 
 ---
 
