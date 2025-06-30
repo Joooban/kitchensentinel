@@ -1,0 +1,34 @@
+# 👋 Welcome to Kitchen Sentinel
+
+![Kitchen Sentinel Logo](![Kitchen Sentinel](https://github.com/user-attachments/assets/46070eb3-0179-4b69-a4ac-6a2be73557aa)
+
+**Kitchen Sentinel** is our smart IoT-based kitchen safety system designed to assist elderly users and caregivers by detecting gas leaks, flames, and motion inactivity.
+
+This repository contains everything you need to explore our project—from the mobile app and embedded system code to documentation and evaluations.
+
+---
+
+## 📱 Try the Prototype
+
+Check out our **interactive mobile app prototype** on Figma:  
+🔗 [Figma Prototype](https://www.figma.com/file/your-figma-link)
+
+---
+
+## 📖 Read the User Manual
+
+For full usage instructions, feature breakdowns, hardware setup, and Firebase structure:  
+📘 [USER_MANUAL.md](./USER_MANUAL.md)
+
+---
+
+## 📜 Certificate of Completion
+We’ve also included our **Coursera Certificate** demonstrating our successful completion of the related course:  
+
+- [Marga Pilapil](./AAA_Part%203/Team%20MPM_Certificates/margapilapil.pdf)
+- [Jhouvann Morden](./AAA_Part%203/Team%20MPM_Certificates/jhouvannmorden.pdf)
+- [Mel Macabenta](./AAA_Part%203/Team%20MPM_Certificates/melmacabenta.pdf)
+
+---
+
+Thank you for visiting our repository! Feel free to explore, fork, or leave feedback.
