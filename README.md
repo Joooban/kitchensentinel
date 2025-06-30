@@ -27,9 +27,9 @@ For full usage instructions, feature breakdowns, hardware setup, and Firebase st
 ## 📜 Certificate of Completion
 We’ve also included our **Coursera Certificate** demonstrating our successful completion of the related course:  
 
-- [Marga Pilapil](./AAA_Part%203/Team%20MPM_Certificates/margapilapil.pdf)
-- [Jhouvann Morden](./AAA_Part%203/Team%20MPM_Certificates/jhouvannmorden.pdf)
-- [Mel Macabenta](./AAA_Part%203/Team%20MPM_Certificates/melmacabenta.pdf)
+- [Marga Pilapil](./Team%20MPM_Certificates/margapilapil.pdf)  
+- [Jhouvann Morden](./Team%20MPM_Certificates/jhouvannmorden.pdf)  
+- [Mel Macabenta](./Team%20MPM_Certificates/melmacabenta.pdf)
 
 ---
 
