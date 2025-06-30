@@ -1,7 +1,7 @@
 # 👋 Welcome to Kitchen Sentinel
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/46070eb3-0179-4b69-a4ac-6a2be73557aa" alt="Kitchen Sentinel Logo" width="200"/>
+  <img src="https://github.com/user-attachments/assets/06207b2e-703c-4176-9418-94cf8dda8ddf" alt="Kitchen Sentinel Logo" width="200"/>
 </p>
 
 **Kitchen Sentinel** is our smart IoT-based kitchen safety system designed to assist elderly users and caregivers by detecting gas leaks, flames, and motion inactivity.
