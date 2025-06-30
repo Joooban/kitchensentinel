@@ -13,7 +13,7 @@ This repository contains everything you need to explore our project — from the
 ## 📱 Try the Prototype
 
 Check out our **interactive mobile app prototype** on Figma:  
-🔗 [Figma Prototype](https://www.figma.com/file/your-figma-link)
+🔗 [Figma Prototype](https://www.figma.com/proto/zxHhrWDK6nB4wN1uAssqkv/Kitchen-Sentinel?node-id=1-12&t=WvQxUwbHwrIIjJR7-1&starting-point-node-id=1%3A12)
 
 ---
 
