@@ -46,31 +46,6 @@
 
 ---
 
-## ☁️ Firebase Realtime Database
-
-The app listens to the following Firebase Realtime Database structure:
-
-```json
-sensors: {
-  latest: {
-    gasLeak: true,
-    flamePresence: true,
-    motionDetected: false,
-    lastUpdated: "2025-06-30T07:00:00Z",
-    systemReset: false
-  }
-}
-alerts: {
-  1688123456789: {
-    type: "NO_MOTION_GAS",
-    message: "No motion + Gas detected!",
-    timestamp: "2025-06-30T07:00:00Z",
-    severity: "HIGH",
-    resolved: false
-  }
-}
-```
-
 The app subscribes to changes and notifies users if new high-severity alerts are pushed.
 
 ---
